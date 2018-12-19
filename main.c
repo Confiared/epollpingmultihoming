@@ -207,6 +207,7 @@ int main (int argc, char *argv[])
     if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sdmain, &evmain) == -1)
         fprintf(stderr, "epoll_ctl sfd");
 
+    int lastUpIP=-1;
     bool firstPing=true;
     for (;;) {
         if ((nfds = epoll_wait(epollfd, events, MAX_EVENTS, -1)) == -1)
@@ -218,12 +219,9 @@ int main (int argc, char *argv[])
                     printf("failed to read timer, %s", strerror(errno));
                     exit(1);
                 }
-                if (value > 1)
-                    printf("missed timmer interval");
-                if (value == 0)
-                    printf("double timer read");
                 if(!firstPing)
                     seq++;
+                int firstUpIP=-1;
                 for (unsigned int z = 0; z < hostcount; z++)
                 {
                     if(!firstPing)
@@ -232,6 +230,8 @@ int main (int argc, char *argv[])
                         const uint8_t filterValue=(ipList[z].lastStateList & 0x0F);
                         if(filterValue == 0x0F && ipList[z].lastState==false)
                         {
+                            if(firstUpIP==-1)
+                                firstUpIP=z;
                             printf("%s is now UP\n", ipList[z].address);
                             ipList[z].lastState=true;
                         }
@@ -245,6 +245,16 @@ int main (int argc, char *argv[])
                     const int sd=ipList[z].sd;
                     struct sockaddr_in *saddr=addr[z];
                     ping(saddr, sd, seq);
+                }
+                if(firstUpIP!=-1 && lastUpIP!=firstUpIP)
+                {
+                    lastUpIP=firstUpIP;
+                    const char* scriptbase = "up.sh ";
+                    char* full = malloc(strlen(scriptbase)+1+strlen(ipList[lastUpIP].address));
+                    strcpy(full, scriptbase); /* copy name into the new var */
+                    strcat(full, ipList[lastUpIP].address); /* add the extension */
+                    printf("%s is now first valide ip route (call: %s)\n", ipList[lastUpIP].address, full);
+                    system(full);
                 }
                 firstPing=false;
             }

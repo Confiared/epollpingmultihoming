@@ -1,4 +1,4 @@
-mergedping is tool to ping multiple ip and say the first ip in list up
+This is tool to ping multiple ip and say the first ip in list up
 
 associated with route to an ip via a specific gateway, it allow check if path via an ISP is UP
 Why just not do bash script for each gateway?
@@ -7,6 +7,6 @@ Why just not do bash script for each gateway?
  - Just transmit the UP ip and deduce the working gateway to update dns
 
 This software do ping via icmp and epoll. No thread. Checked by memory check (valgrind). Good performance (minimal computing, no timming and other not used stuff).
-Oriented on IPv4 public fixed ip for multihoming.
+Oriented on IPv4 public fixed ip for multihoming. Compatible with C99, C11 and maybe the last C standard
 
 When change detected, call "up.sh" into current folder
