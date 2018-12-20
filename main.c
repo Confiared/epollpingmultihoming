@@ -233,10 +233,11 @@ int main (int argc, char *argv[])
                     {
                         ipList[z].lastStateList=(ipList[z].lastStateList*2) | ipList[z].replyReceived;
                         const uint8_t filterValue=(ipList[z].lastStateList & 0x0F);
-                        if(filterValue == 0x0F && ipList[z].lastState==false)
-                        {
+                        if(ipList[z].lastState==true)
                             if(firstUpIP==-1)
                                 firstUpIP=z;
+                        if(filterValue == 0x0F && ipList[z].lastState==false)
+                        {
                             printf("%s is now UP\n", ipList[z].address);
                             ipList[z].lastState=true;
                         }
