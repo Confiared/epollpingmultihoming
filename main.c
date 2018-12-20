@@ -16,6 +16,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdbool.h>
+#include <libgen.h>
 
 #define MAX_EVENTS 16
 
@@ -74,12 +75,12 @@ void parseReply(void *buf)
         }
         index++;
     }
-    if(index==hostcount)
+    /*if(index==hostcount)
     {
         printf("unknown reply detect\n");
         exit(1);
         return;
-    }
+    }*/
 }
 
 void ping(struct sockaddr_in *addr, const int sd/*struct protoent *proto*/, unsigned short cnt/*, unsigned short hostid*/)
@@ -108,6 +109,10 @@ int main (int argc, char *argv[])
         printf("argument count error\n");
         exit(1);
     }
+
+    dirname(argv[0]);
+    strcat(argv[0], "/");
+    printf("path=%s\n", argv[0]);
 
     //parse text
     char *name = "PINGD";
@@ -250,8 +255,9 @@ int main (int argc, char *argv[])
                 {
                     lastUpIP=firstUpIP;
                     const char* scriptbase = "up.sh ";
-                    char* full = malloc(strlen(scriptbase)+1+strlen(ipList[lastUpIP].address));
-                    strcpy(full, scriptbase); /* copy name into the new var */
+                    char* full = malloc(strlen(argv[0])+strlen(scriptbase)+strlen(ipList[lastUpIP].address)+1);
+                    strcpy(full, argv[0]); /* copy name into the new var */
+                    strcat(full, scriptbase); /* copy name into the new var */
                     strcat(full, ipList[lastUpIP].address); /* add the extension */
                     printf("%s is now first valide ip route (call: %s)\n", ipList[lastUpIP].address, full);
                     system(full);
