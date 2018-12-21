@@ -42,6 +42,15 @@ struct _host
     int sd;
 };
 
+char *gettime()
+{
+    time_t t;
+    time(&t);
+    char* p = ctime(&t);
+    const size_t l=strlen(p);
+    p[l-1]='\0';
+    return p;
+}
 unsigned short checksum(void *b, int len)
 {
     unsigned short *buf = b;
@@ -96,6 +105,8 @@ void ping(struct sockaddr_in *addr, const int sd/*struct protoent *proto*/, unsi
 
 int main (int argc, char *argv[])
 {
+    printf("[%s] Start\n", gettime());
+
     hostcount=argc-1;
     unsigned char buf[1024];
     ipList = malloc(sizeof(struct _host) * hostcount);
@@ -238,12 +249,12 @@ int main (int argc, char *argv[])
                                 firstUpIP=z;
                         if(filterValue == 0x0F && ipList[z].lastState==false)
                         {
-                            printf("%s is now UP\n", ipList[z].address);
+                            printf("[%s] %s is now UP\n", gettime(), ipList[z].address);
                             ipList[z].lastState=true;
                         }
                         if(filterValue == 0x00 && ipList[z].lastState==true)
                         {
-                            printf("%s is now DOWN\n", ipList[z].address);
+                            printf("[%s] %s is now DOWN\n", gettime(), ipList[z].address);
                             ipList[z].lastState=false;
                         }
                     }
