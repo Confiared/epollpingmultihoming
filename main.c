@@ -223,7 +223,7 @@ int main (int argc, char *argv[])
     if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sdmain, &evmain) == -1)
         fprintf(stderr, "epoll_ctl sfd");
 
-    char* scriptbase = "up.sh ";
+    const char* scriptbase = "up.sh ";
     char* full = NULL;
     int lastUpIP=-1;
     bool firstPing=true;
