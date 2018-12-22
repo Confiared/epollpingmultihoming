@@ -223,8 +223,11 @@ int main (int argc, char *argv[])
     if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sdmain, &evmain) == -1)
         fprintf(stderr, "epoll_ctl sfd");
 
+    char* scriptbase = "up.sh ";
+    char* full = NULL;
     int lastUpIP=-1;
     bool firstPing=true;
+    int callSkip=0;
     for (;;) {
         if ((nfds = epoll_wait(epollfd, events, MAX_EVENTS, -1)) == -1)
             printf("epoll_wait error %s", strerror(errno));
@@ -265,14 +268,48 @@ int main (int argc, char *argv[])
                 }
                 if(firstUpIP!=-1 && lastUpIP!=firstUpIP)
                 {
+                    callSkip=0;
                     lastUpIP=firstUpIP;
-                    const char* scriptbase = "up.sh ";
-                    char* full = malloc(strlen(argv[0])+strlen(scriptbase)+strlen(ipList[lastUpIP].address)+1);
-                    strcpy(full, argv[0]); /* copy name into the new var */
-                    strcat(full, scriptbase); /* copy name into the new var */
-                    strcat(full, ipList[lastUpIP].address); /* add the extension */
-                    printf("%s is now first valide ip route (call: %s)\n", ipList[lastUpIP].address, full);
-                    system(full);
+                    if(full!=NULL)
+                    {
+                        free(full);
+                        full = malloc(strlen(argv[0])+strlen(scriptbase)+strlen(ipList[lastUpIP].address)+1);
+                        strcpy(full, argv[0]); /* copy name into the new var */
+                        strcat(full, scriptbase); /* copy name into the new var */
+                        strcat(full, ipList[lastUpIP].address); /* add the extension */
+                        printf("%s is now first valide ip route (call: %s later to previous command failed)\n", ipList[lastUpIP].address, full);
+                    }
+                    else
+                    {
+                        full = malloc(strlen(argv[0])+strlen(scriptbase)+strlen(ipList[lastUpIP].address)+1);
+                        strcpy(full, argv[0]); /* copy name into the new var */
+                        strcat(full, scriptbase); /* copy name into the new var */
+                        strcat(full, ipList[lastUpIP].address); /* add the extension */
+                        printf("%s is now first valide ip route (call: %s)\n", ipList[lastUpIP].address, full);
+                        if(system(full)==0)
+                        {
+                            free(full);
+                            full=NULL;
+                        }
+                        else
+                            printf("call: %s failed, call later\n", full);
+                    }
+                }
+                else if(full!=NULL)//recall
+                {
+                    callSkip++;
+                    if(callSkip>15)
+                    {
+                        callSkip=0;
+                        printf("re call: %s\n", full);
+                        if(system(full)==0)
+                        {
+                            free(full);
+                            full=NULL;
+                        }
+                        else
+                            printf("call: %s failed, call later\n", full);
+                    }
                 }
                 firstPing=false;
             }
