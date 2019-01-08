@@ -17,6 +17,7 @@
 #include <arpa/inet.h>
 #include <stdbool.h>
 #include <libgen.h>
+#include <signal.h>
 
 #define MAX_EVENTS 16
 
@@ -50,6 +51,11 @@ char *gettime()
     const size_t l=strlen(p);
     p[l-1]='\0';
     return p;
+}
+void term(int signum)
+{
+    printf("[%s] SIGTERM (%i)\n", gettime(), signum);
+    exit(0);
 }
 unsigned short checksum(void *b, int len)
 {
@@ -106,6 +112,11 @@ void ping(struct sockaddr_in *addr, const int sd/*struct protoent *proto*/, unsi
 int main (int argc, char *argv[])
 {
     printf("[%s] Start\n", gettime());
+
+    struct sigaction action;
+    memset(&action, 0, sizeof(struct sigaction));
+    action.sa_handler = term;
+    sigaction(SIGTERM, &action, NULL);
 
     hostcount=argc-1;
     unsigned char buf[1024];
