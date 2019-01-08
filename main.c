@@ -285,7 +285,7 @@ int main (int argc, char *argv[])
                         strcpy(full, argv[0]); /* copy name into the new var */
                         strcat(full, scriptbase); /* copy name into the new var */
                         strcat(full, ipList[lastUpIP].address); /* add the extension */
-                        printf("%s is now first valide ip route (call: %s)\n", ipList[lastUpIP].address, full);
+                        printf("[%s] %s is now first valide ip route (call: %s)\n", gettime(), ipList[lastUpIP].address, full);
                         if(system(full)==0)
                         {
                             free(full);
@@ -301,7 +301,7 @@ int main (int argc, char *argv[])
                     if(callSkip>15)
                     {
                         callSkip=0;
-                        printf("re call: %s\n", full);
+                        printf("[%s] re call: %s\n", gettime(), full);
                         if(system(full)==0)
                         {
                             free(full);
