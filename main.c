@@ -117,6 +117,7 @@ int main (int argc, char *argv[])
     memset(&action, 0, sizeof(struct sigaction));
     action.sa_handler = term;
     sigaction(SIGTERM, &action, NULL);
+    sigaction(SIGINT, &action, NULL);
 
     hostcount=argc-1;
     unsigned char buf[1024];
