@@ -54,7 +54,18 @@ char *gettime()
 }
 void term(int signum)
 {
-    printf("[%s] SIGTERM (%i)\n", gettime(), signum);
+    switch(signum)
+    {
+        case SIGTERM:
+            printf("[%s] SIGTERM\n", gettime());
+            break;
+        case SIGINT:
+            printf("[%s] SIGINT\n", gettime());
+            break;
+        default:
+            printf("[%s] Signal %i\n", gettime(), signum);
+            break;
+    }
     exit(0);
 }
 unsigned short checksum(void *b, int len)
