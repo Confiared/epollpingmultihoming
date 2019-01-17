@@ -289,7 +289,7 @@ int main (int argc, char *argv[])
                     struct sockaddr_in *saddr=addr[z];
                     ping(saddr, sd, seq);
                 }
-                if(firstUpIP!=-1 && lastUpIP!=firstUpIP)
+                if(firstUpIP!=-1 && (lastUpIP==-1 || ipList[lastUpIP].lastState==false))//lastUpIP!=firstUpIP)
                 {
                     callSkip=0;
                     lastUpIP=firstUpIP;
