@@ -216,7 +216,7 @@ int main (int argc, char *argv[])
 
     //timer to ping at interval
     struct itimerspec it;
-    it.it_interval.tv_sec  = 1;
+    it.it_interval.tv_sec  = 10;
     it.it_interval.tv_nsec = 0;
     it.it_value.tv_sec     = it.it_interval.tv_sec;
     it.it_value.tv_nsec    = it.it_interval.tv_nsec;
@@ -270,9 +270,6 @@ int main (int argc, char *argv[])
                     {
                         ipList[z].lastStateList=(ipList[z].lastStateList*2) | ipList[z].replyReceived;
                         const uint8_t filterValue=(ipList[z].lastStateList & 0x0F);
-                        if(ipList[z].lastState==true)
-                            if(firstUpIP==-1)
-                                firstUpIP=z;
                         if(filterValue == 0x0F && ipList[z].lastState==false)
                         {
                             printf("[%s] %s is now UP\n", gettime(), ipList[z].address);
@@ -283,6 +280,9 @@ int main (int argc, char *argv[])
                             printf("[%s] %s is now DOWN\n", gettime(), ipList[z].address);
                             ipList[z].lastState=false;
                         }
+                        if(ipList[z].lastState==true)
+                            if(firstUpIP==-1)
+                                firstUpIP=z;
                     }
                     ipList[z].replyReceived=false;
                     const int sd=ipList[z].sd;
