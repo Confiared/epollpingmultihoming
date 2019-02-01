@@ -279,6 +279,11 @@ int main (int argc, char *argv[])
                         {
                             printf("[%s] %s is now DOWN\n", gettime(), ipList[z].address);
                             ipList[z].lastState=false;
+
+                            //save the trace route
+                            char saveDown[1024]="down.sh ";
+                            strcat(saveDown, ipList[z].address); /* add the extension */
+                            system(saveDown);
                         }
                         if(ipList[z].lastState==true)
                             if(firstUpIP==-1)
