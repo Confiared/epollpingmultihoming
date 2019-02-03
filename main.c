@@ -281,9 +281,12 @@ int main (int argc, char *argv[])
                             ipList[z].lastState=false;
 
                             //save the trace route
-                            char saveDown[1024]="down.sh ";
+                            char * saveDown = malloc(strlen(argv[0])+strlen("down.sh ")+strlen(ipList[z].address)+1);
+                            strcpy(saveDown, argv[0]); /* copy name into the new var */
+                            strcat(saveDown, "down.sh "); /* copy name into the new var */
                             strcat(saveDown, ipList[z].address); /* add the extension */
                             system(saveDown);
+                            free(saveDown);
                         }
                         if(ipList[z].lastState==true)
                             if(firstUpIP==-1)
