@@ -27,6 +27,7 @@ struct _host *ipList=NULL;
 unsigned int hostcount=0;
 char str[INET_ADDRSTRLEN];
 struct _packet packet;
+bool priority=false;
 
 struct _packet
 {
@@ -149,40 +150,48 @@ int main (int argc, char *argv[])
     printf("path=%s\n", argv[0]);
 
     //parse text
-    char *name = "PINGD";
+    char *name = "CONFIARED";
     unsigned char *header = malloc(strlen(name));
     for (unsigned int i = 0; i < strlen(name); i++)
         header[i] = name[i] + '0';
 
     //parse the ip
     char **hostlist=&argv[1];
+    unsigned indexIpList=0;
     for (unsigned int i = 0; i < hostcount; i++) {
-        ipList[i].address=hostlist[i];
-        ipList[i].socket=malloc(sizeof(struct sockaddr_in));
-        ipList[i].lastState=false;
-        ipList[i].lastStateList=0;
-        memset(ipList[i].socket, 0, sizeof(*ipList[i].socket));
-        const int convertResult=inet_pton(AF_INET,ipList[i].address,&ipList[i].socket->sin_addr);
-        if(convertResult!=1)
-        {
-               printf("not an IPv4");
-               exit(1);
-        }
+        if(strcmp(hostlist[i],"priority")==0)
+            priority=true;
         else
-            ipList[i].socket->sin_family = AF_INET;
+        {
+            ipList[indexIpList].address=hostlist[i];
+            ipList[indexIpList].socket=malloc(sizeof(struct sockaddr_in));
+            ipList[indexIpList].lastState=false;
+            ipList[indexIpList].lastStateList=0;
+            memset(ipList[indexIpList].socket, 0, sizeof(*ipList[indexIpList].socket));
+            const int convertResult=inet_pton(AF_INET,ipList[indexIpList].address,&ipList[indexIpList].socket->sin_addr);
+            if(convertResult!=1)
+            {
+                   printf("not an IPv4");
+                   exit(1);
+            }
+            else
+                ipList[indexIpList].socket->sin_family = AF_INET;
 
-        if ((ipList[i].sd = socket(PF_INET, SOCK_RAW|SOCK_NONBLOCK, proto->p_proto)) < 0) {
-            perror("socket");
-            return -1;
+            if ((ipList[indexIpList].sd = socket(PF_INET, SOCK_RAW|SOCK_NONBLOCK, proto->p_proto)) < 0) {
+                perror("socket");
+                return -1;
+            }
+            const int ttl  = 61;
+            if (setsockopt(ipList[indexIpList].sd, SOL_IP, IP_TTL, &ttl, sizeof(ttl)) != 0)
+                perror("Set TTL option");
+            if (fcntl(ipList[indexIpList].sd, F_SETFL, O_NONBLOCK) != 0 )
+                perror("Request nonblocking I/O");
+
+            addr[i]=ipList[indexIpList].socket;
+            indexIpList++;
         }
-        const int ttl  = 61;
-        if (setsockopt(ipList[i].sd, SOL_IP, IP_TTL, &ttl, sizeof(ttl)) != 0)
-            perror("Set TTL option");
-        if (fcntl(ipList[i].sd, F_SETFL, O_NONBLOCK) != 0 )
-            perror("Request nonblocking I/O");
-
-        addr[i]=ipList[i].socket;
     }
+    hostcount=indexIpList;
 
     //add main sd
     struct sockaddr_in addrmain;
@@ -197,7 +206,7 @@ int main (int argc, char *argv[])
     evmain.data.fd = sdmain;
 
     //prepare the packet
-    const unsigned char ver = 1;
+    const uint16_t ver = 1;
     memset(&packet, 0, sizeof(packet));
     packet.hdr.type       = ICMP_ECHO;
     packet.hdr.un.echo.id = htons(pid);
@@ -297,7 +306,18 @@ int main (int argc, char *argv[])
                     struct sockaddr_in *saddr=addr[z];
                     ping(saddr, sd, seq);
                 }
-                if(firstUpIP!=-1 && (lastUpIP==-1 || ipList[lastUpIP].lastState==false))//lastUpIP!=firstUpIP)
+                bool changeGateway=false;
+                if(priority)
+                {
+                    if(lastUpIP!=firstUpIP)
+                        changeGateway=true;
+                }
+                else
+                {
+                    if(firstUpIP!=-1 && (lastUpIP==-1 || ipList[lastUpIP].lastState==false))
+                        changeGateway=true;
+                }
+                if(changeGateway)
                 {
                     callSkip=0;
                     lastUpIP=firstUpIP;
