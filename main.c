@@ -283,19 +283,34 @@ int main (int argc, char *argv[])
                         {
                             printf("[%s] %s is now UP\n", gettime(), ipList[z].address);
                             ipList[z].lastState=true;
+
+                            struct stat sb;
+                            if(stat("up-without-retry.sh",&sb)==0)
+                            {
+                                char * saveUp = malloc(strlen(argv[0])+strlen("up-without-retry.sh ")+strlen(ipList[z].address)+1);
+                                strcpy(saveUp, argv[0]); /* copy name into the new var */
+                                strcat(saveUp, "up-without-retry.sh "); /* copy name into the new var */
+                                strcat(saveUp, ipList[z].address); /* add the extension */
+                                system(saveUp);
+                                free(saveUp);
+                            }
                         }
                         if(filterValue == 0x00 && ipList[z].lastState==true)
                         {
                             printf("[%s] %s is now DOWN\n", gettime(), ipList[z].address);
                             ipList[z].lastState=false;
 
-                            //save the trace route
-                            char * saveDown = malloc(strlen(argv[0])+strlen("down.sh ")+strlen(ipList[z].address)+1);
-                            strcpy(saveDown, argv[0]); /* copy name into the new var */
-                            strcat(saveDown, "down.sh "); /* copy name into the new var */
-                            strcat(saveDown, ipList[z].address); /* add the extension */
-                            system(saveDown);
-                            free(saveDown);
+                            struct stat sb;
+                            if(stat("down-without-retry.sh",&sb)==0)
+                            {
+                                //save the trace route
+                                char * saveDown = malloc(strlen(argv[0])+strlen("down-without-retry.sh ")+strlen(ipList[z].address)+1);
+                                strcpy(saveDown, argv[0]); /* copy name into the new var */
+                                strcat(saveDown, "down-without-retry.sh "); /* copy name into the new var */
+                                strcat(saveDown, ipList[z].address); /* add the extension */
+                                system(saveDown);
+                                free(saveDown);
+                            }
                         }
                         if(ipList[z].lastState==true)
                             if(firstUpIP==-1)
@@ -324,26 +339,36 @@ int main (int argc, char *argv[])
                     if(full!=NULL)
                     {
                         free(full);
-                        full = malloc(strlen(argv[0])+strlen(scriptbase)+strlen(ipList[lastUpIP].address)+1);
-                        strcpy(full, argv[0]); /* copy name into the new var */
-                        strcat(full, scriptbase); /* copy name into the new var */
-                        strcat(full, ipList[lastUpIP].address); /* add the extension */
-                        printf("%s is now first valide ip route (call: %s later to previous command failed)\n", ipList[lastUpIP].address, full);
+                        struct stat sb;
+                        if(stat("up.sh",&sb)==0)
+                        {
+                            full = malloc(strlen(argv[0])+strlen(scriptbase)+strlen(ipList[lastUpIP].address)+1);
+                            strcpy(full, argv[0]); /* copy name into the new var */
+                            strcat(full, scriptbase); /* copy name into the new var */
+                            strcat(full, ipList[lastUpIP].address); /* add the extension */
+                            printf("%s is now first valide ip route (call: %s later to previous command failed)\n", ipList[lastUpIP].address, full);
+                        }
+                        else
+                            full = NULL;
                     }
                     else
                     {
-                        full = malloc(strlen(argv[0])+strlen(scriptbase)+strlen(ipList[lastUpIP].address)+1);
-                        strcpy(full, argv[0]); /* copy name into the new var */
-                        strcat(full, scriptbase); /* copy name into the new var */
-                        strcat(full, ipList[lastUpIP].address); /* add the extension */
-                        printf("[%s] %s is now first valide ip route (call: %s)\n", gettime(), ipList[lastUpIP].address, full);
-                        if(system(full)==0)
+                        struct stat sb;
+                        if(stat("up.sh",&sb)==0)
                         {
-                            free(full);
-                            full=NULL;
+                            full = malloc(strlen(argv[0])+strlen(scriptbase)+strlen(ipList[lastUpIP].address)+1);
+                            strcpy(full, argv[0]); /* copy name into the new var */
+                            strcat(full, scriptbase); /* copy name into the new var */
+                            strcat(full, ipList[lastUpIP].address); /* add the extension */
+                            printf("[%s] %s is now first valide ip route (call: %s)\n", gettime(), ipList[lastUpIP].address, full);
+                            if(system(full)==0)
+                            {
+                                free(full);
+                                full=NULL;
+                            }
+                            else
+                                printf("call: %s failed, call later\n", full);
                         }
-                        else
-                            printf("call: %s failed, call later\n", full);
                     }
                 }
                 else if(full!=NULL)//recall
