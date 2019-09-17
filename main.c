@@ -31,6 +31,9 @@ unsigned int hostcount=0;
 char str[INET_ADDRSTRLEN];
 struct _packet packet;
 bool priority=false;
+bool help=false;
+bool average=false;
+bool noscript=false;
 
 struct _packet
 {
@@ -41,10 +44,12 @@ struct _host
 {
     char *address;
     struct sockaddr_in *socket;
-    uint8_t lastStateList;
     bool replyReceived;
     bool lastState;
     int sd;
+    bool results[100];
+    unsigned int resultsCount;
+    unsigned int resultSuccess;
 };
 
 char *gettime()
@@ -105,12 +110,12 @@ void parseReply(void *buf)
         }
         index++;
     }
-    /*if(index==hostcount)
+    if(index==hostcount)
     {
         printf("unknown reply detect\n");
-        exit(1);
+        //exit(1);
         return;
-    }*/
+    }
 }
 
 void ping(struct sockaddr_in *addr, const int sd/*struct protoent *proto*/, unsigned short cnt/*, unsigned short hostid*/)
@@ -120,7 +125,9 @@ void ping(struct sockaddr_in *addr, const int sd/*struct protoent *proto*/, unsi
     packet.hdr.checksum = checksum(&packet, sizeof(packet));
 
     if (sendto(sd, &packet, sizeof(packet), 0, (struct sockaddr*)addr, sizeof(*addr)) <= 0 )
-    {}//perror("sendto");
+    {
+        //perror("sendto");
+    }
 }
 
 
@@ -137,7 +144,6 @@ int main (int argc, char *argv[])
     hostcount=argc-1;
     unsigned char buf[1024];
     ipList = malloc(sizeof(struct _host) * hostcount);
-    struct sockaddr_in **addr = malloc(sizeof(struct sockaddr_in *) * hostcount);
 
     //resolv proto and pid
     int pid = getpid();
@@ -162,14 +168,54 @@ int main (int argc, char *argv[])
     char **hostlist=&argv[1];
     unsigned indexIpList=0;
     for (unsigned int i = 0; i < hostcount; i++) {
-        if(strcmp(hostlist[i],"priority")==0)
-            priority=true;
+        if(hostlist[i][0]=='-')
+        {
+            if(hostlist[i][1]=='-')
+            {
+                if(strcmp(hostlist[i],"--help")==0)
+                    help=true;
+                else if(strcmp(hostlist[i],"--priority")==0)
+                    priority=true;
+                else if(strcmp(hostlist[i],"--average")==0)
+                    average=true;
+                else if(strcmp(hostlist[i],"--noscript")==0)
+                    noscript=true;
+                else
+                {
+                    printf("unknown argument: %s",hostlist[i]);
+                    help=true;
+                }
+            }
+            else
+            {
+                int index=1;
+                while(hostlist[i][index]!='\0')
+                {
+                    if(hostlist[i][index]=='h')
+                        help=true;
+                    else if(hostlist[i][index]=='p')
+                        priority=true;
+                    else if(hostlist[i][index]=='a')
+                        average=true;
+                    else if(hostlist[i][index]=='n')
+                        noscript=true;
+                    else
+                    {
+                        printf("unknown argument: %s",hostlist[i]);
+                        help=true;
+                    }
+                    index++;
+                }
+            }
+        }
         else
         {
             ipList[indexIpList].address=hostlist[i];
             ipList[indexIpList].socket=malloc(sizeof(struct sockaddr_in));
             ipList[indexIpList].lastState=false;
-            ipList[indexIpList].lastStateList=0;
+            memset(ipList[indexIpList].results,0,sizeof(ipList[indexIpList].results));
+            ipList[indexIpList].resultsCount=0;
+            ipList[indexIpList].resultSuccess=0;
             memset(ipList[indexIpList].socket, 0, sizeof(*ipList[indexIpList].socket));
             const int convertResult=inet_pton(AF_INET,ipList[indexIpList].address,&ipList[indexIpList].socket->sin_addr);
             if(convertResult!=1)
@@ -190,10 +236,20 @@ int main (int argc, char *argv[])
             if (fcntl(ipList[indexIpList].sd, F_SETFL, O_NONBLOCK) != 0 )
                 perror("Request nonblocking I/O");
 
-            addr[i]=ipList[indexIpList].socket;
             indexIpList++;
         }
     }
+    if(help)
+    {
+        printf("usage: ./epollpingmultihoming [-h] [-p] [-a] [-n] ip <.. ip>\n");
+        printf("-h     --help to show this help\n");
+        printf("-p     --priority to the first have more priority, when back online switch to it\n");
+        printf("-a     --average choice when have lower ping lost average, if near lost then use priority if -p defined\n");
+        printf("-n     --noscript don't call external script\n");
+        return -1;
+    }
+    
+    printf("priority: %i, average: %i, noscript: %i\n", priority, average, noscript);
     hostcount=indexIpList;
 
     //add main sd
@@ -276,56 +332,113 @@ int main (int argc, char *argv[])
                 if(!firstPing)
                     seq++;
                 int firstUpIP=-1;
+                //sort if needed, output 0 to hostcount-1
+                unsigned int indexOrdered[hostcount];
+                for (unsigned int z = 0; z < hostcount; z++)
+                    indexOrdered[z]=z;
+                if(priority || average)
+                {
+                    for (unsigned int c = 0 ; c < hostcount - 1; c++)
+                    {
+                        for (unsigned int d = 0 ; d < hostcount - c - 1; d++)
+                        {
+                            struct _host * hostA=&ipList[indexOrdered[d]];
+                            struct _host * hostB=&ipList[indexOrdered[d+1]];
+                            if(average && hostA->resultsCount>=sizeof(hostA->results))
+                                if (hostA->resultSuccess-3 > hostB->resultSuccess && hostA->resultSuccess*9/10>hostB->resultSuccess) /* For decreasing order use < */
+                                {
+                                    unsigned swap       = indexOrdered[d];
+                                    indexOrdered[d]   = indexOrdered[d+1];
+                                    indexOrdered[d+1] = swap;
+                                }
+                            //else if(priority) already sorted by priority
+                        }
+                    }
+                }
+
                 for (unsigned int z = 0; z < hostcount; z++)
                 {
+                    struct _host * host=&ipList[z];
                     if(!firstPing)
                     {
-                        ipList[z].lastStateList=(ipList[z].lastStateList*2) | ipList[z].replyReceived;
-                        const uint8_t filterValue=(ipList[z].lastStateList & 0x0F);
-                        if(filterValue == 0x0F && ipList[z].lastState==false)
+                        if(host->resultsCount>=sizeof(host->results))
                         {
-                            printf("[%s] %s is now UP\n", gettime(), ipList[z].address);
-                            ipList[z].lastState=true;
+                            if(host->results[0]==true)
+                                host->resultSuccess--;//drop the first need decrease this counter
+                            memcpy(host->results,host->results+1,sizeof(host->results)-1);
+                            host->resultsCount--;
+                        }
+                        host->results[host->resultsCount]=host->replyReceived;
+                        host->resultsCount++;
+                        bool isFullyUp=false;
+                        bool isFullyDown=false;
+                        if(host->resultsCount>=8)
+                        {
+                            /*printf("[%s] %s [%i][%i][%i][%i][%i][%i][%i][%i] host->resultsCount\n", gettime(), host->address,
+                            host->results[host->resultsCount-8],host->results[host->resultsCount-7],
+                            host->results[host->resultsCount-6],host->results[host->resultsCount-5],
+                            host->results[host->resultsCount-4],host->results[host->resultsCount-3],
+                            host->results[host->resultsCount-2],host->results[host->resultsCount-1],
+                            host->resultsCount
+                            );*/
+                            //printf("[%s] %s host->resultsCount>=8\n", gettime(), host->address);
+                            isFullyUp=true;
+                            isFullyDown=true;
+                            unsigned int index=host->resultsCount-8;
+                            while(index<host->resultsCount)
+                            {
+                                if(host->results[index]==false)
+                                    isFullyUp=false;
+                                else
+                                    isFullyDown=false;
+                                index++;
+                            }
+                        }
+                        //printf("[%s] %s is now %i %i last %i\n", gettime(), host->address, isFullyUp, isFullyDown, host->replyReceived);
+                        if(isFullyUp && host->lastState==false)
+                        {
+                            printf("[%s] %s is now UP\n", gettime(), host->address);
+                            host->lastState=true;
 
                             struct stat sb;
-                            if(stat("up-without-retry.sh",&sb)==0)
+                            if(stat("up-without-retry.sh",&sb)==0 && !noscript)
                             {
-                                char * saveUp = malloc(strlen(argv[0])+strlen("up-without-retry.sh ")+strlen(ipList[z].address)+1);
+                                char * saveUp = malloc(strlen(argv[0])+strlen("up-without-retry.sh ")+strlen(host->address)+1);
                                 strcpy(saveUp, argv[0]); /* copy name into the new var */
                                 strcat(saveUp, "up-without-retry.sh "); /* copy name into the new var */
-                                strcat(saveUp, ipList[z].address); /* add the extension */
+                                strcat(saveUp, host->address); /* add the extension */
                                 system(saveUp);
                                 free(saveUp);
                             }
                         }
-                        if(filterValue == 0x00 && ipList[z].lastState==true)
+                        if(isFullyDown && host->lastState==true)
                         {
-                            printf("[%s] %s is now DOWN\n", gettime(), ipList[z].address);
-                            ipList[z].lastState=false;
+                            printf("[%s] %s is now DOWN\n", gettime(), host->address);
+                            host->lastState=false;
 
                             struct stat sb;
-                            if(stat("down-without-retry.sh",&sb)==0)
+                            if(stat("down-without-retry.sh",&sb)==0 && !noscript)
                             {
                                 //save the trace route
-                                char * saveDown = malloc(strlen(argv[0])+strlen("down-without-retry.sh ")+strlen(ipList[z].address)+1);
+                                char * saveDown = malloc(strlen(argv[0])+strlen("down-without-retry.sh ")+strlen(host->address)+1);
                                 strcpy(saveDown, argv[0]); /* copy name into the new var */
                                 strcat(saveDown, "down-without-retry.sh "); /* copy name into the new var */
-                                strcat(saveDown, ipList[z].address); /* add the extension */
+                                strcat(saveDown, host->address); /* add the extension */
                                 system(saveDown);
                                 free(saveDown);
                             }
                         }
-                        if(ipList[z].lastState==true)
+                        if(host->lastState==true)
                             if(firstUpIP==-1)
                                 firstUpIP=z;
                     }
-                    ipList[z].replyReceived=false;
-                    const int sd=ipList[z].sd;
-                    struct sockaddr_in *saddr=addr[z];
+                    host->replyReceived=false;
+                    const int sd=host->sd;
+                    struct sockaddr_in *saddr=ipList[z].socket;
                     ping(saddr, sd, seq);
                 }
                 bool changeGateway=false;
-                if(priority)
+                if(priority || average)
                 {
                     if(lastUpIP!=firstUpIP)
                         changeGateway=true;
@@ -343,7 +456,7 @@ int main (int argc, char *argv[])
                     {
                         free(full);
                         struct stat sb;
-                        if(stat("up.sh",&sb)==0)
+                        if(stat("up.sh",&sb)==0 && !noscript)
                         {
                             full = malloc(strlen(argv[0])+strlen(scriptbase)+strlen(ipList[lastUpIP].address)+1);
                             strcpy(full, argv[0]); /* copy name into the new var */
@@ -357,7 +470,7 @@ int main (int argc, char *argv[])
                     else
                     {
                         struct stat sb;
-                        if(stat("up.sh",&sb)==0)
+                        if(stat("up.sh",&sb)==0 && !noscript)
                         {
                             full = malloc(strlen(argv[0])+strlen(scriptbase)+strlen(ipList[lastUpIP].address)+1);
                             strcpy(full, argv[0]); /* copy name into the new var */
