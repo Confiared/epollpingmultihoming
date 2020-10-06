@@ -61,6 +61,7 @@ char *gettime()
     p[l-1]='\0';
     return p;
 }
+
 void term(int signum)
 {
     switch(signum)
@@ -248,8 +249,13 @@ int main (int argc, char *argv[])
         printf("-n     --noscript don't call external script\n");
         return -1;
     }
-    
+
     printf("priority: %i, average: %i, noscript: %i\n", priority, average, noscript);
+    {
+        struct stat sb;
+        if(stat("up.sh",&sb)!=0)
+            printf("\e[31m\e[1mup.sh not found\e[39m\e[0m\n");
+    }
     hostcount=indexIpList;
 
     //add main sd
@@ -403,10 +409,16 @@ int main (int argc, char *argv[])
                             struct stat sb;
                             if(stat("up-without-retry.sh",&sb)==0 && !noscript)
                             {
-                                char * saveUp = malloc(strlen(argv[0])+strlen("up-without-retry.sh ")+strlen(host->address)+1);
+                                uint strlenaddr=0;
+                                if(host->address!=NULL)
+                                    strlenaddr=strlen(host->address);
+                                else
+                                    printf("internal bug: address null at %i\n", z);
+                                char * saveUp = malloc(strlen(argv[0])+strlen("up-without-retry.sh ")+strlenaddr+1);
                                 strcpy(saveUp, argv[0]); /* copy name into the new var */
                                 strcat(saveUp, "up-without-retry.sh "); /* copy name into the new var */
-                                strcat(saveUp, host->address); /* add the extension */
+                                if(host->address!=NULL)
+                                    strcat(saveUp, host->address); /* add the extension */
                                 system(saveUp);
                                 free(saveUp);
                             }
@@ -420,10 +432,16 @@ int main (int argc, char *argv[])
                             if(stat("down-without-retry.sh",&sb)==0 && !noscript)
                             {
                                 //save the trace route
-                                char * saveDown = malloc(strlen(argv[0])+strlen("down-without-retry.sh ")+strlen(host->address)+1);
+                                uint strlenaddr=0;
+                                if(host->address!=NULL)
+                                    strlenaddr=strlen(host->address);
+                                else
+                                    printf("internal bug: address null at %i\n", z);
+                                char * saveDown = malloc(strlen(argv[0])+strlen("down-without-retry.sh ")+strlenaddr+1);
                                 strcpy(saveDown, argv[0]); /* copy name into the new var */
                                 strcat(saveDown, "down-without-retry.sh "); /* copy name into the new var */
-                                strcat(saveDown, host->address); /* add the extension */
+                                if(host->address!=NULL)
+                                    strcat(saveDown, host->address); /* add the extension */
                                 system(saveDown);
                                 free(saveDown);
                             }
@@ -434,13 +452,13 @@ int main (int argc, char *argv[])
                     }
                     host->replyReceived=false;
                     const int sd=host->sd;
-                    struct sockaddr_in *saddr=ipList[z].socket;
+                    struct sockaddr_in *saddr=host->socket;
                     ping(saddr, sd, seq);
                 }
                 bool changeGateway=false;
                 if(priority || average)
                 {
-                    if(lastUpIP!=firstUpIP)
+                    if(firstUpIP!=-1 && lastUpIP!=firstUpIP)
                         changeGateway=true;
                 }
                 else
@@ -450,45 +468,75 @@ int main (int argc, char *argv[])
                 }
                 if(changeGateway)
                 {
+                    if(lastUpIP>=0 && lastUpIP<hostcount)
+                        printf("%s changeGateway\n", ipList[lastUpIP].address);
+                    else
+                        printf("NULL changeGateway, lastUpIP %d out of range %d\n", lastUpIP, hostcount);
                     callSkip=0;
                     lastUpIP=firstUpIP;
-                    if(full!=NULL)
+                    if(lastUpIP>=0 && lastUpIP<hostcount)
                     {
-                        free(full);
-                        struct stat sb;
-                        if(stat("up.sh",&sb)==0 && !noscript)
+                        if(full!=NULL)
                         {
-                            full = malloc(strlen(argv[0])+strlen(scriptbase)+strlen(ipList[lastUpIP].address)+1);
-                            strcpy(full, argv[0]); /* copy name into the new var */
-                            strcat(full, scriptbase); /* copy name into the new var */
-                            strcat(full, ipList[lastUpIP].address); /* add the extension */
-                            printf("%s is now first valide ip route (call: %s later to previous command failed)\n", ipList[lastUpIP].address, full);
-                        }
-                        else
-                            full = NULL;
-                    }
-                    else
-                    {
-                        struct stat sb;
-                        if(stat("up.sh",&sb)==0 && !noscript)
-                        {
-                            full = malloc(strlen(argv[0])+strlen(scriptbase)+strlen(ipList[lastUpIP].address)+1);
-                            strcpy(full, argv[0]); /* copy name into the new var */
-                            strcat(full, scriptbase); /* copy name into the new var */
-                            strcat(full, ipList[lastUpIP].address); /* add the extension */
-                            printf("[%s] %s is now first valide ip route (call: %s)\n", gettime(), ipList[lastUpIP].address, full);
-                            if(system(full)==0)
+                            printf("%s full!=NULL\n", ipList[lastUpIP].address);
+                            free(full);
+                            struct stat sb;
+                            if(stat("up.sh",&sb)==0 && !noscript && firstUpIP!=-1)
                             {
-                                free(full);
-                                full=NULL;
+                                uint strlenaddr=0;
+                                if(ipList[lastUpIP].address!=NULL)
+                                    strlenaddr=strlen(ipList[lastUpIP].address);
+                                else
+                                    printf("internal bug: address null at %i\n", lastUpIP);
+                                full = malloc(strlen(argv[0])+strlen(scriptbase)+strlenaddr+1);
+                                strcpy(full, argv[0]); /* copy name into the new var */
+                                strcat(full, scriptbase); /* copy name into the new var */
+                                if(ipList[lastUpIP].address!=NULL)
+                                    strcat(full, ipList[lastUpIP].address); /* add the extension */
+                                printf("%s is now first valide ip route (call: %s later to previous command failed)\n", ipList[lastUpIP].address, full);
                             }
                             else
-                                printf("call: %s failed, call later\n", full);
+                                full = NULL;
+                        }
+                        else
+                        {
+                            printf("%s full==NULL\n", ipList[lastUpIP].address);
+                            struct stat sb;
+                            if(stat("up.sh",&sb)==0 && !noscript && firstUpIP!=-1)
+                            {
+                                printf("%s full==NULL a\n", ipList[lastUpIP].address);
+                                uint strlenaddr=0;
+                                if(ipList[lastUpIP].address!=NULL)
+                                    strlenaddr=strlen(ipList[lastUpIP].address);
+                                else
+                                    printf("internal bug: address null at %i\n", lastUpIP);
+                                full = malloc(strlen(argv[0])+strlen(scriptbase)+strlenaddr+1);
+                                strcpy(full, argv[0]); /* copy name into the new var */
+                                strcat(full, scriptbase); /* copy name into the new var */
+                                if(ipList[lastUpIP].address!=NULL)
+                                    strcat(full, ipList[lastUpIP].address); /* add the extension */
+                                printf("[%s] %s is now first valide ip route (call: %s)\n", gettime(), ipList[lastUpIP].address, full);
+                                if(system(full)==0)
+                                {
+                                    free(full);
+                                    full=NULL;
+                                }
+                                else
+                                    printf("call: %s failed, call later\n", full);
+                            }
+                            else
+                                printf("%s full==NULL, noscript: %i, firstUpIP: %i\n", ipList[lastUpIP].address, noscript, firstUpIP);
                         }
                     }
+                    else
+                        printf("NULL changeGateway, lastUpIP %d out of range %d\n", lastUpIP, hostcount);
                 }
                 else if(full!=NULL)//recall
                 {
+                    if(lastUpIP>=0 && lastUpIP<hostcount)
+                        printf("%s full==NULL 2\n", ipList[lastUpIP].address);
+                    else
+                        printf("NULL full==NULL, lastUpIP %d out of range %d\n", lastUpIP, hostcount);
                     callSkip++;
                     if(callSkip>15)
                     {
@@ -503,6 +551,8 @@ int main (int argc, char *argv[])
                             printf("call: %s failed, call later\n", full);
                     }
                 }
+                /*else if(lastUpIP>=0 && lastUpIP<hostcount)
+                    printf("%s full==NULL 3\n", ipList[lastUpIP].address);*/
                 firstPing=false;
             }
             if (events[n].data.fd == sdmain) {
