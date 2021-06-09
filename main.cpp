@@ -27,7 +27,7 @@
 #include <net/ethernet.h>	//For ether_header
 #include <net/if.h>
 
-#define MAX_EVENTS 16
+#define MAX_EVENTS 1024
 #define MAXGATEWAY 4
 #define MACADDRESSSIZE 6
 
@@ -495,7 +495,8 @@ int main (int argc, char *argv[])
     sigaction(SIGINT, &action, NULL);
 
     hostcount=0;
-    unsigned char buf[65535];
+    unsigned char buf[128];
+    memset(buf, 0, sizeof(buf));
 
     if(argc<2) {
         printf("argument count error\n");
@@ -665,6 +666,7 @@ int main (int argc, char *argv[])
         perror("socket");
         exit(255);
     }
+    setsockopt(sockfd, SOL_SOCKET, SO_BINDTODEVICE, DEFAULT_IF, strlen(DEFAULT_IF));
 
     /* Get the index of the interface to send on */
     memset(&if_idx, 0, sizeof(struct ifreq));
@@ -818,7 +820,7 @@ int main (int argc, char *argv[])
                     hostEntryIndex=0;
             }
             else if (events[n].data.fd == sockfd) {
-                memset(buf, 0, sizeof(buf));
+                //memset(buf, 0, sizeof(buf));
                 socklen_t src_addr_size = sizeof(struct sockaddr_ll);
                 sockaddr_ll socket_address_temp=socket_address;
                 const ssize_t bytes = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&socket_address_temp, &src_addr_size);
