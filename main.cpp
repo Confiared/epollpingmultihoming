@@ -68,9 +68,9 @@ uint8_t stringreplaceAll(std::string& str, const std::string& from, const std::s
 
 std::string dateimteString()
 {
-    auto end = std::chrono::system_clock::now();
-    std::time_t end_time = std::chrono::system_clock::to_time_t(end);
-    std::string d((std::ctime(&end_time))+std::string(" "));
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+    std::string d(std::to_string(tm.tm_year + 1900)+"-"+std::to_string(tm.tm_mon + 1)+"-"+std::to_string(tm.tm_mday)+" "+std::to_string(tm.tm_hour)+":"+std::to_string(tm.tm_min)+":"+std::to_string(tm.tm_sec)+" ");
     stringreplaceAll(d,"\n","");
     stringreplaceAll(d,"\r","");
     stringreplaceAll(d,"\t","");
@@ -85,14 +85,10 @@ void sigchldHandler(int signum)
 	// Reap all dead child processes
 	while ((pid = waitpid(-1, &status, WNOHANG)) > 0)
 	{
-		if (WIFEXITED(status))
-		{
-            std::cout << dateimteString() << "Child process " << pid << " terminated with exit status: " << WEXITSTATUS(status) << " signum: " << signum << " line " << __LINE__ << std::endl;
-		}
-		else if (WIFSIGNALED(status))
-		{
-            std::cout << dateimteString() << "Child process " << pid << " killed by signal: " << WTERMSIG(status) << " signum: " << signum << " line " << __LINE__ << std::endl;
-		}
+        if (WIFEXITED(status))
+            std::cout << /*dateimteString() deadlock, time is not signal safe, see https://man7.org/linux/man-pages/man7/signal-safety.7.html << */ "Child process " << pid << " terminated with exit status: " << WEXITSTATUS(status) << " signum: " << signum << " line " << __LINE__ << std::endl;
+        else if (WIFSIGNALED(status))
+            std::cout << /*dateimteString() deadlock, time is not signal safe, see https://man7.org/linux/man-pages/man7/signal-safety.7.html << */ "Child process " << pid << " killed by signal: " << WTERMSIG(status) << " signum: " << signum << " line " << __LINE__ << std::endl;
 
         for(unsigned int i =0; i<destinations.size(); i++)
 		{
@@ -594,7 +590,7 @@ int main(int argc, char *argv[])
                     sourceIP.pingProcessId=0;
                     sourceIP.resetCount=0;
 					createChild(&sourceIP,&dest);
-                    std::cout << "now " << dest.IP << " via " << sourceIP.IP << " is on " << sourceIP.fd << " line " << __LINE__ << std::endl;
+                    std::cout << dateimteString() << "now " << dest.IP << " via " << sourceIP.IP << " is on " << sourceIP.fd << " line " << __LINE__ << std::endl;
 					destinations.back().sourceIP.push_back(sourceIP);
 
 					indexsourceIP++;
